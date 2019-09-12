@@ -1,0 +1,14 @@
+[package]
+name = "minitokio"
+version = "0.1.0"
+authors = ["Alex Zatelepin <mvzp10@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+mio = "0.6"
+slab = "0.4"
+crossbeam = "0.7"
+
+[dev-dependencies]
+httparse = "1.3"
+chrono = "0.4.7"
