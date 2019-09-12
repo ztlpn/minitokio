@@ -10,4 +10,4 @@ Don't use for anything serious, use [tokio](https://tokio.rs/) instead.
 ## Examples
 
 See `examples/http_server.rs` for a simple HTTP server. Run with `cargo run --release --example http_server`
-and point your browser or your favorite load testing tool at `127.0.0.1:8000`.
+and point your browser or your favorite load testing tool at `http://127.0.0.1:8000/`.
