@@ -50,10 +50,20 @@ struct ExecutorInner {
 
 impl ExecutorInner {
     /// Create a new toplevel task and immediately schedule it for execution.
-    fn spawn<T>(this: &Arc<Self>, task: T) where T: Future<Output = ()> + Send + 'static {
+    /// Optionally a caller can pass a channel that will be used to send the task result.
+    fn spawn<F, R>(this: &Arc<Self>, future: F, result_channel: Option<channel::Sender<R>>)
+    where F: Future<Output = R> + Send + 'static,
+          R: Send + 'static {
+        let wrapped_future = async move {
+            let res = future.await;
+            if let Some(chan) = result_channel {
+                let _ = chan.send(res);
+            }
+        };
+
         let id = this.tasks.lock().unwrap().insert(TaskState::Executing);
         let task = Task {
-            future: Box::pin(task),
+            future: Box::pin(wrapped_future),
             id,
             waker: Self::get_waker(this, id),
         };
@@ -68,14 +78,6 @@ impl ExecutorInner {
         if let TaskState::Waiting(task) = std::mem::replace(task_state, TaskState::ScheduledAgain) {
             *task_state = TaskState::Executing;
             self.ready_sender.send(task).unwrap();
-        }
-    }
-
-    /// Wait until there is no more tasks in this executor.
-    fn block_until_done(&self) {
-        let mut tasks = self.tasks.lock().unwrap();
-        while !tasks.is_empty() {
-            tasks = self.done_cond.wait(tasks).unwrap();
         }
     }
 }
@@ -277,7 +279,7 @@ impl ExecutorInner {
 pub fn spawn<T>(task: T)
 where T: Future<Output = ()> + Send + 'static {
     if let Some(executor) = Executor::current() {
-        ExecutorInner::spawn(&executor, task);
+        ExecutorInner::spawn(&executor, task, None);
     }
 }
 
@@ -439,12 +441,14 @@ impl Runtime {
         })
     }
 
-    /// Run the task (represented by a Future) to completion.
-    pub fn run<T>(&mut self, task: T)
-    where T: Future<Output = ()> + Send + 'static {
+    /// Run the task (represented by a Future) to completion and return its result.
+    pub fn run<F, R>(&mut self, future: F) -> R
+    where F: Future<Output = R> + Send + 'static,
+          R: Send + 'static {
         let executor = self.executor.inner.as_ref().unwrap();
-        ExecutorInner::spawn(executor, task);
-        executor.block_until_done();
+        let (result_sender, result_receiver) = channel::bounded(0);
+        ExecutorInner::spawn(executor, future, Some(result_sender));
+        result_receiver.recv().unwrap()
     }
 }
 
