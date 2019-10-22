@@ -1,7 +1,7 @@
 [package]
 name = "minitokio"
 version = "0.1.0"
-authors = ["Alex Zatelepin <mvzp10@gmail.com>"]
+authors = ["Alexey Zatelepin <alex.zatelepin@gmail.com>"]
 edition = "2018"
 
 [dependencies]
